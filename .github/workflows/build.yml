@@ -41,6 +41,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Instalar gperf
+        run: choco install gperf -y
+
       - name: Instalar dependencias
         run: |
           vcpkg install zlib:x64-windows openssl:x64-windows
