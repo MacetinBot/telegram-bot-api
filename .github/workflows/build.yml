@@ -1,0 +1,89 @@
+name: Build Telegram Bot API
+
+on:
+  workflow_dispatch: # Solo se activa manualmente
+
+jobs:
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Instalar dependencias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make git zlib1g-dev libssl-dev gperf cmake clang libc++-dev libc++abi-dev
+
+      - name: Compilar
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+                -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
+                ..
+          cmake --build . --target install
+
+      - name: Subir binario
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-bot-api-linux
+          path: /usr/local/bin/telegram-bot-api
+
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Instalar dependencias
+        run: |
+          vcpkg install zlib:x64-windows openssl:x64-windows
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows
+
+      - name: Compilar
+        run: |
+          mkdir build
+          cd build
+          cmake -A x64 `
+                -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+                -DCMAKE_BUILD_TYPE=Release `
+                ..
+          cmake --build . --config Release --target install
+
+      - name: Subir binario
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-bot-api-windows
+          path: C:/Program Files/Telegram Bot API/bin/telegram-bot-api.exe
+
+  build-mac:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Instalar dependencias
+        run: |
+          brew install gperf cmake openssl
+
+      - name: Compilar
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl \
+                ..
+          cmake --build . --target install
+
+      - name: Subir binario
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-bot-api-mac
+          path: /usr/local/bin/telegram-bot-api
