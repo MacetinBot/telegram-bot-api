@@ -5,75 +5,129 @@ on:
 
 jobs:
 
+  # =========================================================
+  # LINUX
+  # =========================================================
   build-linux:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Instalar dependencias
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
-            make git zlib1g-dev libssl-dev \
-            gperf cmake clang libc++-dev libc++abi-dev
-
-      - name: Compilar
-        run: |
-          mkdir build
-          cd build
-
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_CXX_COMPILER=clang++ \
-                -DCMAKE_C_COMPILER=clang \
-                -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-                -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
-                ..
-
-          cmake --build . -j$(nproc)
-
-      - name: Subir binario
-        uses: actions/upload-artifact@v4
-        with:
-          name: telegram-bot-api-linux
-          path: build/telegram-bot-api
-
-  build-windows:
-    runs-on: windows-2022
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Instalar gperf
-        run: choco install gperf -y
-
-      - name: Instalar dependencias
-        run: |
-          vcpkg install zlib:x64-windows openssl:x64-windows
-        env:
-          VCPKG_DEFAULT_TRIPLET: x64-windows
+            make \
+            git \
+            zlib1g-dev \
+            libssl-dev \
+            gperf \
+            cmake \
+            clang \
+            libc++-dev \
+            libc++abi-dev
 
       - name: Configurar CMake
         run: |
           mkdir build
           cd build
 
-          cmake -A x64 `
-                -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
-                -DCMAKE_BUILD_TYPE=Release `
-                ..
+          cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+            -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
+            ..
 
       - name: Compilar
         run: |
           cd build
-          cmake --build . --config Release
+          cmake --build . -j$(nproc)
 
-      - name: Subir binario
+      - name: Preparar release Linux
+        run: |
+          mkdir release
+
+          cp build/telegram-bot-api release/
+          chmod +x release/telegram-bot-api
+
+      - name: Subir release Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-bot-api-linux
+          path: release
+
+  # =========================================================
+  # WINDOWS (STATIC BUILD)
+  # =========================================================
+  build-windows:
+    runs-on: windows-2022
+
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows-static
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Instalar gperf
+        run: choco install gperf -y
+
+      # -----------------------------------------------------
+      # Dependencias STATIC
+      # -----------------------------------------------------
+      - name: Instalar dependencias
+        run: |
+          vcpkg install `
+            zlib:x64-windows-static `
+            openssl:x64-windows-static
+
+      # -----------------------------------------------------
+      # Configurar CMake
+      # -----------------------------------------------------
+      - name: Configurar CMake
+        run: |
+          mkdir build
+          cd build
+
+          cmake -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DCMAKE_BUILD_TYPE=Release `
+            ..
+
+      # -----------------------------------------------------
+      # Compilar
+      # -----------------------------------------------------
+      - name: Compilar
+        run: |
+          cd build
+
+          cmake --build . `
+            --config Release
+
+      # -----------------------------------------------------
+      # Preparar release
+      # -----------------------------------------------------
+      - name: Preparar release Windows
+        run: |
+          mkdir release
+
+          copy build\Release\telegram-bot-api.exe release\
+
+      # -----------------------------------------------------
+      # Subir release
+      # -----------------------------------------------------
+      - name: Subir release Windows
         uses: actions/upload-artifact@v4
         with:
           name: telegram-bot-api-windows
-          path: build/Release/telegram-bot-api.exe
+          path: release
